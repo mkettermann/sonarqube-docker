@@ -66,6 +66,38 @@ Por ser um link, basta recompilar para atualizar o comando: depois de um `git pu
 
 > Sem `npm link`, use o caminho completo: `node C:\PROJETOS\sonarqube-docker\dist\bin\sonar-local.js <comando>`.
 
+### Máquinas com fnm (ou nvm) e várias versões do Node
+
+O `npm link` instala o comando na pasta global **da versão do Node ativa naquele momento**.
+Com o fnm trocando de versão ao entrar numa pasta (`--use-on-cd`), basta entrar num projeto
+que fixa outra versão para o comando sumir. O sintoma é este erro:
+*"sonar-local não é reconhecido como nome de cmdlet"*.
+
+Nesse caso, use os shims da pasta [`bin/`](../bin) no lugar do `npm link`. Eles ficam fora das
+pastas do fnm e, se o fnm estiver instalado, sempre rodam o CLI com a versão do
+`.node-version` deste repositório (`fnm exec`), qualquer que seja o Node ativo. Ainda é preciso
+ter essa versão instalada (`fnm install` na pasta do repositório). Sem fnm, os shims usam o
+`node` do PATH.
+
+1. Na pasta do repositório, compile o CLI com `npm install`, como no início deste passo.
+2. Remova o link antigo, se houver, com a versão em que ele foi criado ativa:
+   `npm unlink -g sonarqube-docker`.
+3. Adicione `bin/` ao PATH do usuário.
+
+   No Windows (PowerShell):
+
+   ```powershell
+   $bin = 'C:\PROJETOS\sonarqube-docker\bin'
+   $atual = [Environment]::GetEnvironmentVariable('Path', 'User')
+   [Environment]::SetEnvironmentVariable('Path', "$atual;$bin", 'User')
+   ```
+
+   No Linux/macOS, inclua no `~/.bashrc` ou no `~/.zshrc`:
+   `export PATH="$PATH:$HOME/PROJETOS/sonarqube-docker/bin"`.
+4. Abra um terminal novo. No VS Code, feche e abra o editor inteiro, porque os terminais
+   integrados herdam o PATH de quando ele abriu. Depois, confira com `sonar-local help`
+   dentro de um projeto que usa outra versão do Node.
+
 ## 5. Subir e configurar
 
 ```text
@@ -102,3 +134,5 @@ npm unlink -g sonarqube-docker              # remove o comando sonar-local
 docker compose down -v                      # derruba e APAGA os dados (histórico de análises)
 docker volume rm sonarqube-local-scanner-cache
 ```
+
+Se você usou os shims de `bin/` em vez do `npm link`, tire essa pasta do PATH do usuário.

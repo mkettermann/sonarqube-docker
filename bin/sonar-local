@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Shim do sonar-local para Linux/macOS/Git Bash, independente do Node ativo.
+# Com o fnm instalado, roda o CLI com a versão do .node-version deste repositório,
+# mesmo dentro de projetos que fixam outra versão. Sem fnm, usa o node do PATH.
+# Uso: adicione a pasta bin/ deste repositório ao PATH (docs/instalacao.md).
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+CLI="$RAIZ/dist/bin/sonar-local.js"
+if command -v fnm >/dev/null 2>&1; then
+	exec fnm exec --using="$RAIZ/.node-version" node "$CLI" "$@"
+fi
+exec node "$CLI" "$@"
