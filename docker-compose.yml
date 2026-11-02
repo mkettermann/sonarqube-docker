@@ -1,0 +1,76 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SonarQube LOCAL compartilhado — um único servidor para todos os projetos desta
+# máquina (somente desenvolvimento).
+#
+#   npm run up       # sobe SonarQube + Postgres dele (http://localhost:9000)
+#   npm run down     # derruba (os volumes ficam; `docker compose down -v` zera)
+#
+# Os projetos analisados NÃO sobem nada: rodam `sonar-local scan` (bin/sonar-local.mjs),
+# que usa este servidor e roda o scanner num container da rede `sonarqube-local-net`.
+#
+# Credenciais e porta vêm do `.env` (copie de `.env.example`). A porta é publicada
+# só em 127.0.0.1: o painel não fica acessível pela rede.
+# ─────────────────────────────────────────────────────────────────────────────
+name: sonarqube-local
+
+services:
+
+  sonarqube-db:
+    image: postgres:16-alpine
+    container_name: sonarqube-local-db
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:-sonar}
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube-local-db-data:/var/lib/postgresql/data
+    networks:
+      - sonarqube-local-net
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U sonar -d sonarqube" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sonarqube:
+    image: ${SONARQUBE_IMAGE:-sonarqube:community}
+    container_name: sonarqube-local
+    depends_on:
+      sonarqube-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:-sonar}
+      SONAR_TELEMETRY_ENABLE: "false"
+      # ⚠️ No Docker Desktop (WSL2) o `vm.max_map_count` do kernel fica no default
+      # (65530) e o Elasticsearch embutido recusa subir pelo bootstrap check. Sem
+      # mmap ele não exige o limite — custo de desempenho irrelevante num Sonar local.
+      SONAR_SEARCH_JAVAADDITIONALOPTS: -Dnode.store.allow_mmap=false
+    ports:
+      - "127.0.0.1:${SONAR_PORT:-9000}:9000"
+    volumes:
+      - sonarqube-local-data:/opt/sonarqube/data
+      - sonarqube-local-extensions:/opt/sonarqube/extensions
+      - sonarqube-local-logs:/opt/sonarqube/logs
+    networks:
+      - sonarqube-local-net
+    restart: unless-stopped
+
+volumes:
+  sonarqube-local-db-data:
+    name: sonarqube-local-db-data
+  sonarqube-local-data:
+    name: sonarqube-local-data
+  sonarqube-local-extensions:
+    name: sonarqube-local-extensions
+  sonarqube-local-logs:
+    name: sonarqube-local-logs
+
+networks:
+  # Nome fixo: o scanner de cada projeto entra nesta rede e fala com
+  # `http://sonarqube-local:9000`, independente da porta publicada no host.
+  sonarqube-local-net:
+    name: sonarqube-local-net
+    driver: bridge

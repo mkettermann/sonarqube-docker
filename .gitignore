@@ -1,0 +1,6 @@
+.env
+node_modules/
+
+# Relatórios gerados ao analisar este próprio repositório
+.scannerwork/
+.sonar-local/

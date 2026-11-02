@@ -1,0 +1,20 @@
+{
+	"name": "sonarqube-docker",
+	"version": "1.0.0",
+	"private": true,
+	"description": "SonarQube local compartilhado entre os projetos da máquina + CLI sonar-local.",
+	"type": "module",
+	"bin": {
+		"sonar-local": "bin/sonar-local.mjs"
+	},
+	"scripts": {
+		"up": "docker compose up -d",
+		"down": "docker compose down",
+		"logs": "docker compose logs -f sonarqube",
+		"status": "node bin/sonar-local.mjs status",
+		"test": "node --test"
+	},
+	"engines": {
+		"node": ">=20"
+	}
+}
