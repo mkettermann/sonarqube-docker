@@ -5,7 +5,7 @@
 #   npm run up       # sobe SonarQube + Postgres dele (http://localhost:9000)
 #   npm run down     # derruba (os volumes ficam; `docker compose down -v` zera)
 #
-# Os projetos analisados NÃO sobem nada: rodam `sonar-local scan` (bin/sonar-local.mjs),
+# Os projetos analisados NÃO sobem nada: rodam `sonar-local scan` (src/bin/sonar-local.ts),
 # que usa este servidor e roda o scanner num container da rede `sonarqube-local-net`.
 #
 # Credenciais e porta vêm do `.env` (copie de `.env.example`). A porta é publicada

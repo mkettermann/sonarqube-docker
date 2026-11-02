@@ -11,7 +11,7 @@ link para a explicação.
 │   sonarqube-local     SonarQube Community  → http://localhost:9000 (só 127.0.0.1)
 │   sonarqube-local-db  Postgres 16
 │   rede sonarqube-local-net + volumes sonarqube-local-*
-│ bin/sonar-local.mjs  CLI global `sonar-local` (Node, zero dependências)
+│ src/bin/sonar-local.ts  CLI global `sonar-local` (TypeScript, zero dependências em runtime)
 └──────────────────────────────────────────────────┘
           ▲ API (senha do admin no .env)       ▲ rede Docker
           │                                    │
@@ -62,19 +62,32 @@ Opções: `--dir <pasta>` (projeto, padrão a pasta atual), `--saida <pasta>` (r
 (ex.: `sonar-local scan -- -Dsonar.verbose=true`).
 
 Na pasta deste repositório também há `npm run up`, `npm run down`, `npm run logs`,
-`npm run status` e `npm test` (testes do CLI).
+`npm run status`, `npm test` (testes do CLI), `npm run typecheck`, `npm run check` (tipos +
+testes) e `npm run build` (recompila o `dist/`).
 
 ## Estrutura
 
 ```text
 docker-compose.yml               SonarQube + Postgres (projeto Compose sonarqube-local)
 .env.example                     modelo do .env (porta, senha do admin, imagens)
-bin/sonar-local.mjs              CLI (comandos e mensagens)
-lib/config.mjs                   .env, sonar-project.properties, argumentos
-lib/servidor.mjs                 Web API: subir, senha do admin, projeto, token, tarefa
-lib/scanner.mjs                  docker run do sonar-scanner-cli
-lib/cobertura.mjs                acha os lcov.info e corrige os caminhos
-lib/relatorio.mjs                resumo.md / issues.md / *.json
+src/bin/sonar-local.ts           CLI (comandos e mensagens)
+src/lib/config.ts                .env, sonar-project.properties, argumentos
+src/lib/servidor.ts              Web API: subir, senha do admin, projeto, token, tarefa
+src/lib/scanner.ts               docker run do sonar-scanner-cli
+src/lib/cobertura.ts             acha os lcov.info e corrige os caminhos
+src/lib/relatorio.ts             resumo.md / issues.md / *.json
+dist/                            CLI compilado (gerado por `npm install`/`npm run build`, não versionado)
 templates/sonar-project.properties  modelo para projetos novos
-test/                            testes (node --test)
+test/                            testes (node --test, direto no .ts)
+tsconfig.json                    checagem de tipos de src/ e test/ (tsconfig.build.json emite o dist/)
 ```
+
+### Desenvolvimento
+
+O CLI é TypeScript sem dependências em runtime; as únicas dependências são de desenvolvimento
+(`typescript` e `@types/node`). `npm run check` roda a checagem de tipos e os testes.
+
+O código também roda direto no Node, sem compilar (type stripping: `npm test`,
+`npm run status`). Por isso o `tsconfig.json` liga o `erasableSyntaxOnly` (sem `enum`,
+`namespace` nem parameter properties) e os imports relativos levam `.ts`, que o `tsc`
+reescreve para `.js` no `dist/`.

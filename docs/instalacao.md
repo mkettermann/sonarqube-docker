@@ -8,7 +8,7 @@ Passo a passo para deixar o SonarQube compartilhado rodando numa máquina e o co
 | Item | Versão | Observação |
 | --- | --- | --- |
 | Docker | Docker Desktop (Windows/macOS) ou Docker Engine + Compose v2 (Linux) | no Windows, com o backend WSL2 |
-| Node.js | 20 ou superior | só para o CLI `sonar-local` (zero dependências) |
+| Node.js | 24 ou superior | só para o CLI `sonar-local` (TypeScript, zero dependências em runtime) |
 | Git | qualquer | para clonar este repositório |
 
 **Memória:** o SonarQube (com o Elasticsearch embutido) usa de 2 a 3 GB. No Docker Desktop,
@@ -52,14 +52,19 @@ mesmo valor.
 Na pasta do repositório:
 
 ```text
+npm install
 npm link
 ```
 
-Isso cria o comando global `sonar-local`, um link para `bin/sonar-local.mjs`. Ele encontra o
-`.env` e o `docker-compose.yml` deste repositório sozinho, a partir de qualquer pasta. Por
-ser um link, um `git pull` aqui já atualiza o comando. Confira com `sonar-local help`.
+O `npm install` baixa as dependências de desenvolvimento (`typescript` e `@types/node`) e
+compila o CLI de `src/` para `dist/`. O `npm link` cria o comando global `sonar-local`, um
+link para `dist/bin/sonar-local.js`. Ele encontra o `.env` e o `docker-compose.yml` deste
+repositório sozinho, a partir de qualquer pasta. Confira com `sonar-local help`.
 
-> Sem `npm link`, use o caminho completo: `node C:\PROJETOS\sonarqube-docker\bin\sonar-local.mjs <comando>`.
+Por ser um link, basta recompilar para atualizar o comando: depois de um `git pull`, rode
+`npm install` (ou só `npm run build`, se as dependências não mudaram).
+
+> Sem `npm link`, use o caminho completo: `node C:\PROJETOS\sonarqube-docker\dist\bin\sonar-local.js <comando>`.
 
 ## 5. Subir e configurar
 

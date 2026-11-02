@@ -1,5 +1,6 @@
 .env
 node_modules/
+dist/
 
 # Relatórios gerados ao analisar este próprio repositório
 .scannerwork/

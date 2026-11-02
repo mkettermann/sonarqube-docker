@@ -9,6 +9,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import type { Cliente } from './servidor.ts';
+
 const LIMITE_PAGINAS = 20; // 20 × 500 = 10 mil: o teto da paginação da API de issues
 const ORDEM_SEVERIDADE = ['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'INFO'];
 
@@ -23,52 +25,124 @@ const METRICAS = {
 	reliability_rating: 'Confiabilidade',
 	security_rating: 'Segurança',
 	sqale_rating: 'Manutenibilidade',
-};
+} as const satisfies Record<string, string>;
+
+type Metrica = keyof typeof METRICAS;
+const CHAVES_METRICAS = Object.keys(METRICAS) as Metrica[];
+
+// Só os campos usados aqui; os JSON exportados levam o objeto completo da API.
+export interface Medida {
+	metric: string;
+	value: string;
+}
+
+export interface CondicaoDoGate {
+	status: string;
+	metricKey: string;
+	actualValue?: string;
+	comparator?: string;
+	errorThreshold?: string;
+}
+
+export interface Gate {
+	status?: string;
+	conditions?: CondicaoDoGate[];
+}
+
+export interface Issue {
+	component: string;
+	rule: string;
+	message: string;
+	line?: number;
+	severity?: string;
+	type?: string;
+}
+
+export interface Hotspot {
+	component: string;
+	ruleKey: string;
+	message: string;
+	line?: number;
+	securityCategory?: string;
+	vulnerabilityProbability?: string;
+}
+
+export interface Resultado {
+	medidas: Medida[];
+	gate: Gate | undefined;
+	issues: Issue[];
+	hotspots: Hotspot[];
+	/** Chave da regra → nome. */
+	regras: Map<string, string>;
+}
+
+export interface DadosDoRelatorio extends Resultado {
+	chave: string;
+	nome: string;
+	url: string;
+}
+
+interface Pagina {
+	paging?: { total?: number };
+	total?: number;
+	[campo: string]: unknown;
+}
 
 /** Ratings vêm como `1.0`…`5.0`; o painel mostra A…E. */
-function valorDaMetrica({ metric, value }) {
+function valorDaMetrica({ metric, value }: Medida): string {
 	return metric.endsWith('_rating') ? ('ABCDE'[Math.round(Number(value)) - 1] ?? value) : value;
 }
 
-async function paginar(cliente, caminho, campo, aoLerPagina) {
-	const itens = [];
+async function paginar<T, P extends Pagina = Pagina>(cliente: Cliente, caminho: string, campo: string, aoLerPagina?: (json: P | null) => void): Promise<T[]> {
+	const itens: T[] = [];
 	for (let p = 1; p <= LIMITE_PAGINAS; p++) {
-		const { status, json, texto } = await cliente.chamar(`${caminho}&ps=500&p=${p}`);
+		const { status, json, texto } = await cliente.chamar<P>(`${caminho}&ps=500&p=${p}`);
 		if (status >= 300) throw new Error(`Falha em ${caminho} (${status}): ${texto}`);
 		aoLerPagina?.(json);
-		if (!json?.[campo]?.length) break;
-		itens.push(...json[campo]);
-		if (itens.length >= (json.paging?.total ?? json.total ?? 0)) break;
+		const pagina = json?.[campo] as T[] | undefined;
+		if (!pagina?.length) break;
+		itens.push(...pagina);
+		if (itens.length >= (json?.paging?.total ?? json?.total ?? 0)) break;
 	}
 	return itens;
 }
 
-export async function coletarResultado(cliente, chave) {
+export async function coletarResultado(cliente: Cliente, chave: string): Promise<Resultado> {
 	const k = encodeURIComponent(chave);
-	const { json: medidas } = await cliente.chamar(`/api/measures/component?component=${k}&metricKeys=${Object.keys(METRICAS).join(',')}`);
-	const { json: gate } = await cliente.chamar(`/api/qualitygates/project_status?projectKey=${k}`);
-	const regras = new Map();
-	const issues = await paginar(cliente, `/api/issues/search?components=${k}&resolved=false&additionalFields=rules`, 'issues', (json) => {
-		for (const r of json?.rules ?? []) regras.set(r.key, r.name);
-	});
-	const hotspots = await paginar(cliente, `/api/hotspots/search?project=${k}&status=TO_REVIEW`, 'hotspots');
+	const { json: medidas } = await cliente.chamar<{ component?: { measures?: Medida[] } }>(
+		`/api/measures/component?component=${k}&metricKeys=${CHAVES_METRICAS.join(',')}`,
+	);
+	const { json: gate } = await cliente.chamar<{ projectStatus?: Gate }>(`/api/qualitygates/project_status?projectKey=${k}`);
+	const regras = new Map<string, string>();
+	const issues = await paginar<Issue, Pagina & { rules?: { key: string; name: string }[] }>(
+		cliente,
+		`/api/issues/search?components=${k}&resolved=false&additionalFields=rules`,
+		'issues',
+		(json) => {
+			for (const r of json?.rules ?? []) regras.set(r.key, r.name);
+		},
+	);
+	const hotspots = await paginar<Hotspot>(cliente, `/api/hotspots/search?project=${k}&status=TO_REVIEW`, 'hotspots');
 	return { medidas: medidas?.component?.measures ?? [], gate: gate?.projectStatus, issues, hotspots, regras };
 }
 
-function contar(itens, chave) {
-	const mapa = new Map();
+function contar<T>(itens: readonly T[], chave: (item: T) => string): [string, number][] {
+	const mapa = new Map<string, number>();
 	for (const i of itens) {
 		const k = chave(i);
 		mapa.set(k, (mapa.get(k) ?? 0) + 1);
 	}
-	return [...mapa.entries()].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+	return [...mapa.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-const arquivoDe = (chave) => (item) => item.component.replace(`${chave}:`, '');
-const posicaoSeveridade = (s) => (ORDEM_SEVERIDADE.includes(s) ? ORDEM_SEVERIDADE.indexOf(s) : ORDEM_SEVERIDADE.length);
-const linkRegra = (url, regra) => `${url}/coding_rules?open=${encodeURIComponent(regra)}&rule_key=${encodeURIComponent(regra)}`;
+const arquivoDe =
+	(chave: string) =>
+	(item: { component: string }): string =>
+		item.component.replace(`${chave}:`, '');
+const posicaoSeveridade = (s: string): number => (ORDEM_SEVERIDADE.includes(s) ? ORDEM_SEVERIDADE.indexOf(s) : ORDEM_SEVERIDADE.length);
+const linkRegra = (url: string, regra: string): string => `${url}/coding_rules?open=${encodeURIComponent(regra)}&rule_key=${encodeURIComponent(regra)}`;
 
-export function montarResumo({ chave, nome, url, medidas, gate, issues, hotspots }) {
+export function montarResumo({ chave, nome, url, medidas, gate, issues, hotspots }: DadosDoRelatorio): string {
 	const condicoesReprovadas = (gate?.conditions ?? []).filter((c) => c.status === 'ERROR');
 	return [
 		`# Relatório SonarQube — ${nome}`,
@@ -80,10 +154,10 @@ export function montarResumo({ chave, nome, url, medidas, gate, issues, hotspots
 		'',
 		'| Métrica | Valor |',
 		'|---|---|',
-		...Object.keys(METRICAS)
-			.map((metrica) => medidas.find((m) => m.metric === metrica))
-			.filter(Boolean)
-			.map((m) => `| ${METRICAS[m.metric]} | ${valorDaMetrica(m)} |`),
+		...CHAVES_METRICAS.flatMap((metrica) => {
+			const m = medidas.find((x) => x.metric === metrica);
+			return m ? [`| ${METRICAS[metrica]} | ${valorDaMetrica(m)} |`] : [];
+		}),
 		'',
 		`## Issues abertas: ${issues.length}`,
 		'',
@@ -113,14 +187,9 @@ export function montarResumo({ chave, nome, url, medidas, gate, issues, hotspots
 	].join('\n');
 }
 
-export function montarListaDeIssues({ chave, nome, url, issues, hotspots, regras }) {
+export function montarListaDeIssues({ chave, nome, url, issues, hotspots, regras }: DadosDoRelatorio): string {
 	const arquivo = arquivoDe(chave);
-	const porArquivo = new Map();
-	for (const i of issues) {
-		const a = arquivo(i);
-		if (!porArquivo.has(a)) porArquivo.set(a, []);
-		porArquivo.get(a).push(i);
-	}
+	const porArquivo = Map.groupBy(issues, arquivo);
 	const arquivos = [...porArquivo.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
 
 	const linhas = [
@@ -156,9 +225,9 @@ export function montarListaDeIssues({ chave, nome, url, issues, hotspots, regras
 	return linhas.join('\n');
 }
 
-export async function exportarRelatorio(cliente, { chave, nome, dirSaida }) {
+export async function exportarRelatorio(cliente: Cliente, { chave, nome, dirSaida }: { chave: string; nome: string; dirSaida: string }): Promise<DadosDoRelatorio> {
 	const resultado = await coletarResultado(cliente, chave);
-	const dados = { chave, nome, url: cliente.url, ...resultado };
+	const dados: DadosDoRelatorio = { chave, nome, url: cliente.url, ...resultado };
 	mkdirSync(dirSaida, { recursive: true });
 	writeFileSync(join(dirSaida, 'resumo.md'), montarResumo(dados));
 	writeFileSync(join(dirSaida, 'issues.md'), montarListaDeIssues(dados));

@@ -1,0 +1,11 @@
+// Build do CLI: src/ → dist/ (o `bin` do package.json aponta para dist/bin/sonar-local.js).
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"rootDir": "src",
+		"outDir": "dist",
+		"noEmit": false,
+		"sourceMap": true
+	},
+	"include": ["src"]
+}

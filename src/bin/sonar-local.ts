@@ -1,18 +1,29 @@
 #!/usr/bin/env node
 // sonar-local — analisa qualquer projeto desta máquina contra o SonarQube local
-// compartilhado (docker-compose.yml deste repositório). Zero dependências.
+// compartilhado (docker-compose.yml deste repositório). Zero dependências em runtime.
 //
-// Instalação (uma vez por máquina, na pasta deste repositório): `npm link`.
+// Instalação (uma vez por máquina, na pasta deste repositório): `npm install` e `npm link`
+// (o `prepare` compila src/ para dist/, para onde o comando global aponta).
 // Uso: veja `sonar-local help` ou docs/novo-projeto.md.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 
-import { prepararCoberturas } from '../lib/cobertura.mjs';
-import { ADMIN_LOGIN, RAIZ_SERVIDOR, carregarAmbiente, lerArgumentos, lerPropriedadesDoProjeto, relativoAoProjeto } from '../lib/config.mjs';
-import { exportarRelatorio } from '../lib/relatorio.mjs';
-import { rodarScanner } from '../lib/scanner.mjs';
+import { prepararCoberturas } from '../lib/cobertura.ts';
 import {
+	ADMIN_LOGIN,
+	RAIZ_SERVIDOR,
+	type ChaveValor,
+	type Opcoes,
+	carregarAmbiente,
+	lerArgumentos,
+	lerPropriedadesDoProjeto,
+	relativoAoProjeto,
+} from '../lib/config.ts';
+import { exportarRelatorio } from '../lib/relatorio.ts';
+import { rodarScanner } from '../lib/scanner.ts';
+import {
+	type Cliente,
 	aguardarProcessamento,
 	compose,
 	criarCliente,
@@ -22,7 +33,7 @@ import {
 	garantirSenhaAdmin,
 	garantirServidor,
 	statusDoServidor,
-} from '../lib/servidor.mjs';
+} from '../lib/servidor.ts';
 
 const AJUDA = `sonar-local — SonarQube local compartilhado (${RAIZ_SERVIDOR})
 
@@ -48,7 +59,13 @@ Opções:
 
 Relatório: <saida>/resumo.md, issues.md, issues.json, hotspots.json.`;
 
-function exigirProjeto(dir) {
+interface Projeto {
+	props: ChaveValor;
+	chave: string;
+	nome: string;
+}
+
+function exigirProjeto(dir: string): Projeto {
 	const props = lerPropriedadesDoProjeto(dir);
 	if (!props) {
 		throw new Error(`Não há sonar-project.properties em ${dir}. Rode \`sonar-local init\` (ver docs/novo-projeto.md).`);
@@ -67,7 +84,7 @@ async function clientePronto() {
 	return { cliente, ambiente };
 }
 
-async function scan(opcoes) {
+async function scan(opcoes: Opcoes): Promise<void> {
 	const { props, chave, nome } = exigirProjeto(opcoes.dir);
 	if (!relativoAoProjeto(opcoes.dir, opcoes.saida)) throw new Error('--saida precisa ficar dentro do projeto (o scanner só enxerga a pasta do projeto).');
 	const { cliente, ambiente } = await clientePronto();
@@ -79,7 +96,7 @@ async function scan(opcoes) {
 	await report(opcoes, { cliente, chave, nome });
 }
 
-async function report(opcoes, contexto) {
+async function report(opcoes: Opcoes, contexto?: { cliente: Cliente; chave: string; nome: string }): Promise<void> {
 	const { chave, nome } = contexto ?? exigirProjeto(opcoes.dir);
 	const cliente = contexto?.cliente ?? (await clientePronto()).cliente;
 	const { gate, issues, hotspots } = await exportarRelatorio(cliente, { chave, nome, dirSaida: opcoes.saida });
@@ -90,7 +107,7 @@ async function report(opcoes, contexto) {
 	console.log(`[sonar] painel: ${cliente.url}/dashboard?id=${encodeURIComponent(chave)} (login ${ADMIN_LOGIN}, senha SONAR_ADMIN_PASSWORD do .env)`);
 }
 
-function init(opcoes) {
+function init(opcoes: Opcoes): void {
 	const destino = join(opcoes.dir, 'sonar-project.properties');
 	if (existsSync(destino)) {
 		console.log(`[sonar] ${destino} já existe — nada a fazer.`);
@@ -104,26 +121,26 @@ function init(opcoes) {
 	console.log('[sonar] adicione ao .gitignore do projeto: .scannerwork/ e .sonar-local/');
 }
 
-async function token(opcoes) {
+async function token(opcoes: Opcoes): Promise<void> {
 	const { cliente } = await clientePronto();
 	const nome = opcoes.posicionais[0] ?? `sonar-local-${new Date().toISOString().replaceAll(/[:.]/g, '-')}`;
 	console.log(`[sonar] token "${nome}" (guarde: ele não é exibido de novo):`);
 	console.log(await emitirTokenDeUsuario(cliente, nome));
 }
 
-async function setup() {
+async function setup(): Promise<void> {
 	const { cliente } = await clientePronto();
 	console.log(`[sonar] pronto: ${cliente.url} — login ${ADMIN_LOGIN}, senha SONAR_ADMIN_PASSWORD do .env.`);
 }
 
-async function status() {
+async function status(): Promise<void> {
 	const { url } = carregarAmbiente();
 	const s = await statusDoServidor(criarCliente(url, ''));
 	console.log(s ? `[sonar] ${url} — ${s}` : `[sonar] ${url} não responde (rode \`sonar-local up\`).`);
 	if (s !== 'UP') process.exitCode = 1;
 }
 
-const COMANDOS = {
+const COMANDOS: Record<string, (opcoes: Opcoes) => void | Promise<void>> = {
 	scan,
 	report: (o) => report(o),
 	init,
@@ -137,10 +154,11 @@ const COMANDOS = {
 
 try {
 	const opcoes = lerArgumentos(process.argv.slice(2));
-	const comando = COMANDOS[opcoes.comando];
+	// `Object.hasOwn`: `sonar-local toString` não pode cair no protótipo do objeto.
+	const comando = Object.hasOwn(COMANDOS, opcoes.comando) ? COMANDOS[opcoes.comando] : undefined;
 	if (!comando) throw new Error(`Comando desconhecido: ${opcoes.comando} (veja \`sonar-local help\`).`);
 	await comando(opcoes);
 } catch (e) {
-	console.error(`[sonar] ${e.message}`);
+	console.error(`[sonar] ${e instanceof Error ? e.message : String(e)}`);
 	process.exit(1);
 }

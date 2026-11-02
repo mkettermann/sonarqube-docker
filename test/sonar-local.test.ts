@@ -4,18 +4,18 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, describe, it } from 'node:test';
 
-import { descobrirLcovs, reescreverLcov } from '../lib/cobertura.mjs';
-import { carregarAmbiente, lerArgumentos, lerChaveValor, relativoAoProjeto } from '../lib/config.mjs';
-import { montarListaDeIssues, montarResumo } from '../lib/relatorio.mjs';
-import { argumentosDoScanner, idDaTarefa } from '../lib/scanner.mjs';
+import { descobrirLcovs, reescreverLcov } from '../src/lib/cobertura.ts';
+import { carregarAmbiente, lerArgumentos, lerChaveValor, relativoAoProjeto } from '../src/lib/config.ts';
+import { type DadosDoRelatorio, type Issue, montarListaDeIssues, montarResumo } from '../src/lib/relatorio.ts';
+import { argumentosDoScanner, idDaTarefa } from '../src/lib/scanner.ts';
 
-const temporarios = [];
-function pastaTemporaria() {
+const temporarios: string[] = [];
+function pastaTemporaria(): string {
 	const dir = mkdtempSync(join(tmpdir(), 'sonar-local-'));
 	temporarios.push(dir);
 	return dir;
 }
-function criar(dir, caminho, conteudo = '') {
+function criar(dir: string, caminho: string, conteudo = ''): string {
 	const alvo = join(dir, ...caminho.split('/'));
 	mkdirSync(resolve(alvo, '..'), { recursive: true });
 	writeFileSync(alvo, conteudo);
@@ -126,8 +126,8 @@ describe('scanner', () => {
 });
 
 describe('relatório', () => {
-	const issue = (component, line, rule, severity = 'MAJOR') => ({ component: `p:${component}`, line, rule, severity, type: 'CODE_SMELL', message: `msg ${rule}` });
-	const dados = {
+	const issue = (component: string, line: number, rule: string, severity = 'MAJOR'): Issue => ({ component: `p:${component}`, line, rule, severity, type: 'CODE_SMELL', message: `msg ${rule}` });
+	const dados: DadosDoRelatorio = {
 		chave: 'p',
 		nome: 'Projeto',
 		url: 'http://localhost:9000',
