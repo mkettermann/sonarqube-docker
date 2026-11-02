@@ -141,6 +141,8 @@ A extensão **SonarQube for IDE** (VS Code, JetBrains) mostra as issues enquanto
 | --- | --- |
 | `Não há sonar-project.properties` | rode na raiz do projeto, ou use `--dir`; crie o arquivo com `sonar-local init` |
 | Cobertura 0% com lcov existente | o lcov estava fora de `coverage/` e não foi declarado: declare em `sonar.javascript.lcov.reportPaths` |
+| Cobertura 0% e não há lcov | o Vitest não grava o `lcov.info` quando algum teste falha: gere com `npx vitest run --coverage --coverage.reportOnFailure` |
+| Scanner cai com crash nativo (bridge do Node, `SIGSEGV` da JVM) | intermitente: rode de novo antes de mexer na configuração ([operacao.md](operacao.md)) |
 | Scan TS estoura memória | aumente `sonar.javascript.node.maxspace` (MB) no properties, ex.: `8192` |
 | `Falta o .env` / senha não confere | ver [operacao.md](operacao.md) |
 | Projeto com chave errada no painel | apague-o em *Administration → Projects → Management* e rode `scan` com a chave certa |

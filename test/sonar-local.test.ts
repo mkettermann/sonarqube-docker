@@ -5,7 +5,7 @@ import { after, describe, it } from 'node:test';
 import { descobrirLcovs, reescreverLcov } from '../src/lib/cobertura.ts';
 import { carregarAmbiente, lerArgumentos, lerChaveValor, relativoAoProjeto } from '../src/lib/config.ts';
 import { type DadosDoRelatorio, type Issue, montarListaDeIssues, montarResumo } from '../src/lib/relatorio.ts';
-import { argumentosDoScanner, idDaTarefa } from '../src/lib/scanner.ts';
+import { argumentosDoScanner, idDaTarefa, logsDeCrash, recolherLogsDeCrash } from '../src/lib/scanner.ts';
 import { apagarTemporarios, criar, pastaTemporaria } from './apoio.ts';
 
 after(apagarTemporarios);
@@ -109,6 +109,22 @@ describe('scanner', () => {
 		assert.ok(args.includes('C:\\p:/usr/src'));
 		assert.ok(args.includes('SONAR_TOKEN=tk'));
 		assert.deepEqual(args.slice(-3), ['img', '-Dsonar.javascript.lcov.reportPaths=.sonar-local/lcov-1.info', '-X']);
+	});
+
+	it('move para a saída só os logs de crash da JVM que apareceram durante a análise', () => {
+		const raiz = pastaTemporaria();
+		criar(raiz, 'hs_err_pid1.log', 'antigo');
+		const existentes = new Set(logsDeCrash(raiz));
+		criar(raiz, 'hs_err_pid42.log', 'crash');
+		criar(raiz, 'replay_pid42.log', 'replay');
+		criar(raiz, 'hs_err_pid42.txt');
+		criar(raiz, 'meu_hs_err_pid42.log');
+		const saida = join(raiz, '.sonar-local');
+
+		assert.deepEqual(recolherLogsDeCrash(raiz, saida, existentes).sort(), ['hs_err_pid42.log', 'replay_pid42.log']);
+		assert.deepEqual(logsDeCrash(raiz), ['hs_err_pid1.log']);
+		assert.deepEqual(logsDeCrash(saida).sort(), ['hs_err_pid42.log', 'replay_pid42.log']);
+		assert.deepEqual(recolherLogsDeCrash(raiz, join(raiz, 'outra'), existentes), []);
 	});
 });
 

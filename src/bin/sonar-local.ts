@@ -91,7 +91,7 @@ async function scan(opcoes: Opcoes): Promise<void> {
 	await garantirProjeto(cliente, chave, nome);
 	const token = await emitirTokenDeAnalise(cliente, chave);
 	const lcovs = opcoes.semCobertura ? [] : prepararCoberturas(opcoes.dir, opcoes.saida, props);
-	const tarefa = await rodarScanner({ dirProjeto: opcoes.dir, token, imagem: ambiente.imagemScanner, lcovs, extras: opcoes.extras });
+	const tarefa = await rodarScanner({ dirProjeto: opcoes.dir, token, imagem: ambiente.imagemScanner, lcovs, extras: opcoes.extras, dirSaida: opcoes.saida });
 	await aguardarProcessamento(cliente, tarefa);
 	await report(opcoes, { cliente, chave, nome });
 }

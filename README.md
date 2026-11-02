@@ -44,7 +44,7 @@ senha `SONAR_ADMIN_PASSWORD` do `.env` deste repositório).
 | [docs/instalacao.md](docs/instalacao.md) | instalar tudo num computador novo (Docker, `.env`, `npm link`, primeiro start) |
 | [docs/novo-projeto.md](docs/novo-projeto.md) | colocar um projeto para ser analisado, ler o relatório e integrar com o editor |
 | [docs/operacao.md](docs/operacao.md) | dia a dia: subir/derrubar, backup, atualizar o SonarQube, trocar senha, problemas comuns |
-| [docs/migracao-mk-app-br.md](docs/migracao-mk-app-br.md) | aposentar o SonarQube próprio do `mk-app-br` e passar a usar este |
+| [docs/migracao-mk-app-br.md](docs/migracao-mk-app-br.md) | registro da migração (concluída) do `mk-app-br`, que tinha SonarQube próprio, para este |
 
 ## Comandos
 
