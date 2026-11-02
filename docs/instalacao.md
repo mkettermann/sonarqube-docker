@@ -8,7 +8,7 @@ Passo a passo para deixar o SonarQube compartilhado rodando numa máquina e o co
 | Item | Versão | Observação |
 | --- | --- | --- |
 | Docker | Docker Desktop (Windows/macOS) ou Docker Engine + Compose v2 (Linux) | no Windows, com o backend WSL2 |
-| Node.js | 24 ou superior | só para o CLI `sonar-local` (TypeScript, zero dependências em runtime) |
+| Node.js | 24 ou superior (testado na 24.22.2, fixada no `.node-version` para fnm/nvm/volta) | só para o CLI `sonar-local` (TypeScript, zero dependências em runtime) |
 | Git | qualquer | para clonar este repositório |
 
 **Memória:** o SonarQube (com o Elasticsearch embutido) usa de 2 a 3 GB. No Docker Desktop,

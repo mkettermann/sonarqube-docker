@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, describe, it } from 'node:test';
 
@@ -8,20 +6,9 @@ import { descobrirLcovs, reescreverLcov } from '../src/lib/cobertura.ts';
 import { carregarAmbiente, lerArgumentos, lerChaveValor, relativoAoProjeto } from '../src/lib/config.ts';
 import { type DadosDoRelatorio, type Issue, montarListaDeIssues, montarResumo } from '../src/lib/relatorio.ts';
 import { argumentosDoScanner, idDaTarefa } from '../src/lib/scanner.ts';
+import { apagarTemporarios, criar, pastaTemporaria } from './apoio.ts';
 
-const temporarios: string[] = [];
-function pastaTemporaria(): string {
-	const dir = mkdtempSync(join(tmpdir(), 'sonar-local-'));
-	temporarios.push(dir);
-	return dir;
-}
-function criar(dir: string, caminho: string, conteudo = ''): string {
-	const alvo = join(dir, ...caminho.split('/'));
-	mkdirSync(resolve(alvo, '..'), { recursive: true });
-	writeFileSync(alvo, conteudo);
-	return alvo;
-}
-after(() => temporarios.forEach((d) => rmSync(d, { recursive: true, force: true })));
+after(apagarTemporarios);
 
 describe('lerChaveValor', () => {
 	it('lê .env e .properties, ignorando comentários e aspas', () => {

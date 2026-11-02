@@ -1,6 +1,7 @@
 .env
 node_modules/
 dist/
+coverage/
 
 # Relatórios gerados ao analisar este próprio repositório
 .scannerwork/

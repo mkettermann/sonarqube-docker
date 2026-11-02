@@ -63,7 +63,8 @@ Opções: `--dir <pasta>` (projeto, padrão a pasta atual), `--saida <pasta>` (r
 
 Na pasta deste repositório também há `npm run up`, `npm run down`, `npm run logs`,
 `npm run status`, `npm test` (testes do CLI), `npm run typecheck`, `npm run check` (tipos +
-testes) e `npm run build` (recompila o `dist/`).
+testes), `npm run build` (recompila o `dist/`), `npm run test:coverage` (testes + `coverage/lcov.info`)
+e `npm run sonar` (cobertura + `sonar-local scan` deste próprio repositório).
 
 ## Estrutura
 
@@ -78,7 +79,8 @@ src/lib/cobertura.ts             acha os lcov.info e corrige os caminhos
 src/lib/relatorio.ts             resumo.md / issues.md / *.json
 dist/                            CLI compilado (gerado por `npm install`/`npm run build`, não versionado)
 templates/sonar-project.properties  modelo para projetos novos
-test/                            testes (node --test, direto no .ts)
+test/                            testes (node --test, direto no .ts; apoio.ts tem um SonarQube falso)
+sonar-project.properties         análise deste próprio repositório (`npm run sonar`)
 tsconfig.json                    checagem de tipos de src/ e test/ (tsconfig.build.json emite o dist/)
 ```
 
@@ -91,3 +93,6 @@ O código também roda direto no Node, sem compilar (type stripping: `npm test`,
 `npm run status`). Por isso o `tsconfig.json` liga o `erasableSyntaxOnly` (sem `enum`,
 `namespace` nem parameter properties) e os imports relativos levam `.ts`, que o `tsc`
 reescreve para `.js` no `dist/`.
+
+O próprio repositório passa no quality gate do SonarQube local: `npm run sonar` gera a
+cobertura com o test runner do Node (`--test-reporter=lcov`) e analisa `src/` e `test/`.
